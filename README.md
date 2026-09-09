@@ -8,6 +8,12 @@ A reusable agent skill for coordinating a Main/Orchestrator Agent with delegated
 npx skills add escape0707/agent-relay-skill --skill agent-relay-orchestration
 ```
 
+Runtime relay state uses a separate private `<github-login>/agent-relay` repository. Create it once if needed:
+
+```bash
+gh repo create "$(gh api user --jq .login)/agent-relay" --private
+```
+
 ## Structure
 
 ```text
@@ -15,5 +21,8 @@ README.md
 AGENTS.md
 skills/
 └── agent-relay-orchestration/
-    └── SKILL.md
+    ├── SKILL.md
+    └── references/
+        ├── manual-transfer.md
+        └── nested-advisory.md
 ```
