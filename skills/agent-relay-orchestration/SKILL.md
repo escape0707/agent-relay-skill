@@ -1,79 +1,42 @@
 ---
 name: agent-relay-orchestration
-description: Shared protocol for a main/orchestrator agent and delegated subagents using one-to-one GitHub relay branches, compact round files, and single-upload manual artifact fallback.
+description: Shared protocol for a main/orchestrator agent and delegated subagents using one-to-one GitHub relay branches, compact round files, and manual artifact fallback.
 ---
 
 # Agent Relay Orchestration
 
-## 1. Purpose
+## 1. Purpose and Core Invariants
 
-Use this SKILL when one agent should own strategy and final synthesis while another agent performs delegated work in a different environment.
+Use this SKILL when one agent owns strategy and final synthesis while another agent performs delegated work in a different environment.
 
-Typical examples:
+The same SKILL applies to Main Agents and Subagents.
 
-- ChatGPT Web orchestrates a local Codex session with filesystem, shell, Git, or application access.
-- One Main Agent coordinates several devices in parallel through separate relay branches.
-- A Subagent temporarily creates a higher-capability teaching or decision-support child session.
-- GitHub carries prompts, responses, commits, and small artifacts, while browser transfer carries sensitive or large files.
+Core invariants:
 
-The same `SKILL.md` is intended for both Main Agents and Subagents.
+1. The Main Agent owns strategy; the Subagent owns delegated execution.
+2. One relay branch has exactly one Main↔Subagent writer pair.
+3. Runtime relay branches live in the private repository `<github-login>/agent-relay`, where `<github-login>` is the GitHub identity authenticated for relay operations.
+4. Local relay Git state lives under `~/workspaces/agent-relay`, separate from task-project worktrees.
+5. Only the Main endpoint for a relay channel creates formal new rounds.
+6. Role is contextual and relational, never inferred from model capability alone.
+7. Published relay history moves forward; do not rewrite it by default.
+8. Do not invent protocol state, registries, logs, or housekeeping files.
+9. Required sensitive or large artifacts use manual transfer rather than Git.
+10. Nested high-capability advisory sessions are ephemeral advisory leaves, not persistent workers.
 
-### Core rules
-
-1. **The Main Agent owns strategy; the Subagent owns delegated execution.**
-2. **One relay branch = exactly one Main↔Subagent writer pair.**
-3. **All relay branches live in the dedicated private repository `<GitHub-login>/agent-relay`.**
-4. **Local relay Git state lives under `~/workspaces/agent-relay`, separate from task-project worktrees.**
-5. **Only the Main Agent creates new rounds.**
-6. **Role is contextual and relational, not fixed by model or product identity.**
-7. **GitHub is the preferred control plane, not the mandatory transport for every artifact.**
-8. **Manual browser transfer is first-class for sensitive, large, binary, or otherwise unsuitable data.**
-9. **Published relay history moves forward; do not rewrite it by default.**
-10. **User intervention inside a Subagent session is legitimate and reportable.**
-11. **Nested high-capability advisory sessions are ephemeral advisory leaves, not persistent workers.**
-12. **Do not invent protocol state or housekeeping files.**
+Formal relay materials MUST be in English: `prompt.md`, `response.md`, relay commit messages, bootstrap prompts, and protocol artifacts unless task semantics require otherwise. User-facing conversation stays in the language established with the user unless they request a change.
 
 ---
 
-## 2. Language
+## 2. Role Inference and Responsibilities
 
-The Main Agent MUST keep using the natural language already established in its user-facing conversation unless the user requests otherwise.
+### Role inference
 
-Formal agent-to-agent relay materials MUST be in English:
+Prefer Main / Orchestrator when the agent is planning, coordinating, creating rounds, reviewing results, or lacks direct access to the delegated environment.
 
-- `SKILL.md`;
-- `prompt.md`;
-- `response.md`;
-- relay metadata JSON;
-- relay commit messages;
-- bootstrap prompts;
-- small relay artifacts unless task semantics require another language.
+Prefer Subagent when the user provides a relay branch and asks to execute its pending round, provides a concrete prompt-file path, or otherwise clearly delegates execution in an environment with the required local capabilities.
 
-A Subagent MAY converse directly with the user in the user's natural language. Its formal relay report remains English.
-
----
-
-## 3. Role Inference
-
-Role inference should be simple and based on current evidence.
-
-### Prefer Main / Orchestrator when
-
-- the agent is in ChatGPT Web and lacks direct access to the user's local machine;
-- the conversation is clearly about planning, orchestration, prompt creation, response review, or coordinating agents;
-- no explicit evidence says this agent was delegated a task;
-- the agent is deciding whether to start a Subagent.
-
-A ChatGPT Web session with no clear Subagent evidence SHOULD lean Main.
-
-### Prefer Subagent when
-
-- the user gives a relay branch in the configured relay repository and asks for the pending round to be executed;
-- the user gives a concrete prompt Markdown path to execute;
-- the user pastes a concise bootstrap generated by an upstream Main Agent;
-- the local environment has machine/filesystem/shell/Git access and the context clearly indicates delegated execution.
-
-Strong bootstrap evidence:
+A concrete bootstrap such as this is strong Subagent evidence:
 
 ```text
 Read and follow the installed Agent Relay SKILL.
@@ -83,26 +46,7 @@ Relay branch: relay/laptop/photo-import-cleanup
 Execute the pending round.
 ```
 
-### Role is relational
-
-An agent MAY simultaneously be:
-
-- Subagent on an upstream relay; and
-- Main Agent on a downstream relay.
-
-Do not infer role solely from:
-
-- model family;
-- reasoning level;
-- capability tier;
-- product name;
-- local vs web execution.
-
-Model capability and orchestration role are separate dimensions.
-
----
-
-## 4. Responsibilities and Authority
+An agent MAY be Subagent upstream and Main downstream. Model family, reasoning level, product name, and local-vs-web execution do not determine role by themselves.
 
 ### Main Agent
 
@@ -110,86 +54,56 @@ The Main Agent MUST:
 
 - own the overall goal, strategy, risk posture, and final answer;
 - decide when delegation is useful;
-- create the relay branch when using GitHub relay;
-- create every new round;
-- define round scope and important permissions;
-- review Subagent responses, commits, nested relays, and artifacts;
-- inspect work-branch changes directly when useful;
+- create the relay branch and every formal round for that channel;
+- define round scope, permissions, tasks, and deliverables;
+- review `response.md`, artifacts, work commits, deviations, user decisions, and nested relays;
 - integrate results into the user-facing reasoning.
 
-When delegation is chosen, the Main Agent SHOULD proactively give the user a short copy/paste bootstrap prompt. The dedicated relay repository is fixed by this SKILL, so the user should normally need only the relay branch, not repository details.
+When starting a Subagent session, the Main Agent SHOULD provide a short copy/paste bootstrap containing the relay branch.
 
 ### Subagent
 
 The Subagent MUST:
 
 - execute only the current delegated round;
-- follow explicit scope and restrictions;
-- use conservative permissions if scope is ambiguous;
-- report what it actually did;
-- distinguish actions from findings;
-- report durable user decisions;
-- report deviations from the original round;
-- prepare required artifacts before declaring the round terminal;
-- never create the next formal relay round;
+- stay within the prompt's allowed scope unless the user explicitly changes it;
+- act conservatively when scope is ambiguous;
+- distinguish findings from actions and side effects;
+- report durable user decisions and material deviations;
+- prepare required artifacts before publishing a terminal response;
+- never create the next formal round;
 - never silently edit a published Main-Agent prompt.
 
-### Prompt-scoped autonomy
+### Permission precedence
 
-The Subagent MAY act autonomously within explicitly allowed scope without asking for approval for every low-level step.
+Apply permissions in this order:
 
-Recommended prompt section:
+1. system/platform constraints;
+2. current explicit user instruction;
+3. Main-Agent round prompt;
+4. Subagent judgment.
 
-```markdown
-## Scope
-
-### Allowed
-- Read local files.
-- Run diagnostic commands.
-- Create files under the designated work directory.
-- Compile and run tests.
-
-### Not Allowed
-- Delete user data.
-- Modify NAS/server configuration.
-- Install or uninstall software.
-- Push to production branches.
-```
-
-If the prompt is unclear, default conservatively.
-
-Direct user instructions during the Subagent session MAY specifically expand, narrow, or change the scope.
-
-Example:
-
-- “You may edit this config file” authorizes that file edit.
-- It does not imply permission to reboot a server or delete unrelated data.
-
-If user authorization changes the upstream permission boundary, report it under `## Deviations`.
+User authorization is narrow and local to what was actually authorized. If it changes the upstream permission boundary, report the change under `## Deviations`.
 
 ---
 
-## 5. Relay Topology and Branch Naming
+## 3. Relay Infrastructure and Topology
 
-### Fixed relay infrastructure
+### Runtime repository
 
-All relay branches MUST live in the dedicated private repository:
-
-```text
-<GitHub-login>/agent-relay
-```
-
-`<GitHub-login>` is the authenticated GitHub account login.
-
-This relay repository is independent of the repository, machine, or filesystem task being worked on. Do not place relay protocol state inside an unrelated project repository merely because the current agent is running there.
-
-Local agents MUST keep relay Git state under:
+The relay repository is:
 
 ```text
-~/workspaces/agent-relay
+<github-login>/agent-relay
 ```
 
-Recommended local layout:
+It MUST be private. Resolve `<github-login>` from the GitHub identity authenticated for relay operations. If the repository does not exist, report the missing prerequisite; do not create it unless the user explicitly asks. Do not introduce a persistent repository-binding config merely for convenience.
+
+The relay repository is independent of task-project repositories. Do not place relay protocol state in a project repository just because the agent is running there.
+
+### Local relay workspace
+
+Keep local relay Git state under:
 
 ```text
 ~/workspaces/agent-relay/
@@ -198,34 +112,15 @@ Recommended local layout:
     └── <relay-branch-safe-name>/
 ```
 
-`repo/` is the reusable local clone of `<GitHub-login>/agent-relay`. Per-channel worktrees are disposable local execution surfaces. The GitHub relay branch is the durable communication record.
+`repo/` is the reusable clone. Per-channel worktrees are disposable execution surfaces. The GitHub relay branch is the durable source of truth.
 
-On first local use, the Subagent SHOULD:
+On first local use, reuse or create the clone, fetch the requested branch, create/use an isolated worktree, and verify Git read/write and publication capability before substantial work.
 
-1. ensure `~/workspaces/agent-relay` exists;
-2. reuse or create the relay repository clone under `repo/`;
-3. fetch the requested relay branch;
-4. use an isolated worktree under `worktrees/`;
-5. verify required Git read/write access before doing substantial delegated work.
+### Relay branches
 
-### One channel per relay branch
+One relay branch MUST have exactly one Main↔Subagent writer pair. Parallel Subagents require separate branches.
 
-A relay branch MUST have exactly one Main↔Subagent writer pair.
-
-Parallel orchestration uses multiple relay branches:
-
-```text
-Main Agent
-├── relay/desktop/photo-cleanup  ↔ Desktop Subagent
-├── relay/laptop/photo-cleanup   ↔ Laptop Subagent
-└── relay/nas/photo-cleanup      ↔ NAS Subagent
-```
-
-Do not make several Subagents concurrently write the same relay branch.
-
-### Relay branch naming
-
-Recommended:
+Recommended naming:
 
 ```text
 relay/<endpoint-or-agent-name>/<task-slug>
@@ -239,155 +134,33 @@ relay/laptop/photo-import-cleanup
 relay/nas/permission-audit
 ```
 
-The middle component only needs to identify the channel clearly and uniquely.
-
-### Work branch naming
-
-Use the user's normal development convention for actual code/project changes.
-
-Preferred convention here:
-
-```text
-<agent-name>/<branch-name>
-```
-
-Examples:
-
-```text
-codex/feature
-codex/cache-sync
-codex/photo-import
-```
-
-The relay branch is communication history. The work branch is the actual work product.
-
-The relay branch and work branch normally belong to different repositories. Do not copy project changes into the relay repository when a work-branch commit can be referenced instead.
+Actual project work stays on the user's normal project branch convention, such as `<agent-name>/<branch-name>`. Relay branches carry communication; work branches carry project changes. Reference work commits instead of copying large diffs into the relay repository.
 
 ---
 
-## 6. Minimal Relay Tree
+## 4. Round Model and State
 
-Use only this visible branch-root protocol structure unless explicitly asked otherwise:
+Each relay branch uses this visible root-level structure:
 
 ```text
-session.json
 rounds/
-├── 0001-<slug>/
-│   ├── round.json
-│   ├── prompt.md
-│   ├── response.md       # appears when published
-│   └── artifacts.json    # only when needed
-└── 0002-<slug>/
-    └── ...
+└── 0001-<slug>/
+    ├── prompt.md
+    ├── response.md       # absent while pending
+    ├── artifacts/        # optional
+    └── artifacts.json    # optional, only when useful
 ```
 
-### `session.json`
+Do not add a hidden wrapper directory.
 
-Keep it tiny and fixed-purpose:
+Do not create `session.json`, `round.json`, `running.json`, heartbeats, locks, status files, registries, cumulative summaries, or narrative logs as protocol state.
 
-```json
-{
-  "schema": 1,
-  "task": "photo-import-cleanup",
-  "status": "active"
-}
-```
-
-Do NOT accumulate history, findings, summaries, decisions, logs, or changelogs in it.
-
-### `round.json`
-
-Keep it tiny:
-
-```json
-{
-  "round": 4,
-  "slug": "audit-czkawka-cache",
-  "status": "prompted"
-}
-```
-
-Terminal form:
-
-```json
-{
-  "round": 4,
-  "slug": "audit-czkawka-cache",
-  "status": "completed"
-}
-```
-
-### `artifacts.json`
-
-Create only when useful.
-
-Example:
-
-```json
-{
-  "github": ["reports/cache-analysis.json"],
-  "manual": [
-    {
-      "file": "round-0004-return-audit-czkawka-cache.zip",
-      "sha256": "..."
-    }
-  ]
-}
-```
-
-Do not create an empty manifest by default.
-
-### No self-expanding housekeeping
-
-MUST NOT create persistent convenience files such as:
+Round state is inferred only from file presence:
 
 ```text
-README.md
-NOTES.md
-LOG.md
-JOURNAL.md
-PROGRESS.md
-SUMMARY.md
-STATE.md
-HISTORY.md
-TODO.md
+prompt.md exists + response.md absent = pending/open
+response.md exists                     = terminal/responded
 ```
-
-unless the user or upstream Main Agent explicitly requests them for the real task.
-
-MUST NOT invent new registries, schemas, tracking branches, round systems, or cumulative narrative state merely for convenience.
-
-Use Git history and per-round files.
-
----
-
-## 7. Round Lifecycle
-
-Only the Main Agent creates a formal round.
-
-A round begins when the Main Agent publishes its `prompt.md` and `round.json`.
-
-### Open round
-
-A round is open when:
-
-- `prompt.md` exists; and
-- no terminal `response.md` has been published.
-
-An open round may be pending, running, paused, or recovering from interruption.
-
-No heartbeat, lock, running-state, or step-counter file is required.
-
-### Terminal round
-
-Before publishing a terminal response:
-
-1. reach a reportable outcome;
-2. prepare all GitHub-safe artifacts;
-3. prepare the manual return ZIP if one is required;
-4. compute required hashes/references;
-5. publish `response.md`;
-6. update `round.json` to `completed`.
 
 `response.md` outcome MUST be one of:
 
@@ -397,24 +170,47 @@ Partial
 Blocked
 ```
 
-All three are terminal for that round.
+All three are terminal. `Partial` or `Blocked` does not authorize automatic rerun or creation of another round; the Main Agent decides any follow-up.
 
-A `Partial` or `Blocked` outcome does not authorize the Subagent to create another round.
+### Round selection
+
+For `next round`, the Subagent MUST:
+
+1. fetch/pull the relevant relay branch;
+2. find valid round directories whose `prompt.md` exists and `response.md` does not;
+3. select the LOWEST-NUMBERED pending round;
+4. execute exactly that round.
+
+If no pending round exists, report that briefly and do not create one.
+
+The Main Agent SHOULD normally keep only one pending round per channel. It MAY queue several only when they are intentionally independent.
+
+### Publishing a terminal response
+
+Before publishing `response.md`:
+
+1. reach a reportable outcome;
+2. prepare GitHub-safe artifacts;
+3. prepare any required manual return package;
+4. record relevant hashes/references if useful;
+5. publish `response.md`.
+
+The existence of `response.md` makes the round terminal. Do not publish it while promising required artifacts that do not yet exist.
 
 ---
 
-## 8. Prompt Contract
+## 5. Prompt Contract
 
-Recommended Main-Agent prompt structure:
+Use this as the strong default prompt shape:
 
 ```markdown
-# Round 0004 — Audit Czkawka Cache Reuse
+# Round 0004 — <Title>
 
 ## Objective
-State the concrete goal.
+...
 
 ## Context
-Provide only execution-relevant context.
+...
 
 ## Scope
 ### Allowed
@@ -424,7 +220,6 @@ Provide only execution-relevant context.
 
 ## Tasks
 1. ...
-2. ...
 
 ## Deliverables
 - `response.md`
@@ -435,17 +230,15 @@ Provide only execution-relevant context.
 - Sensitive/large artifacts: ...
 ```
 
-This is a strong default, not a rigid form.
+The Main Agent MAY adapt sections when task semantics require it. Round-specific explicit instructions take precedence over generic formatting guidance.
 
-The Main Agent MAY add, remove, merge, rename, or reorder sections when task semantics justify it.
-
-Round-specific explicit instructions take precedence over generic formatting recommendations in this SKILL.
+Keep task instructions in `prompt.md`. Do not duplicate identifiers or metadata that are already unambiguous from the branch/path merely to satisfy a schema.
 
 ---
 
-## 9. Response Contract
+## 6. Response Contract
 
-Recommended Subagent response:
+Use this as the strong default response shape:
 
 ```markdown
 # Round 0004 — Response
@@ -481,598 +274,130 @@ None.
 None.
 ```
 
-The exact formatting MAY adapt, but these semantic distinctions MUST remain clear.
+Preserve these semantic distinctions even if formatting adapts:
 
-### Findings
+- `Findings`: conclusions, observations, and evidence.
+- `User Decisions / Instructions`: durable user choices or instructions that matter upstream; not conversational transcript.
+- `Actions Performed`: actual operations and side effects.
+- `Changes`: project/work-branch refs and concise change summary; do not duplicate large diffs.
+- `Validation`: tests/checks and outcomes.
+- `Artifacts`: committed artifacts and declared manual package.
+- `Nested Relays`: every nested relay created during the round, or `None.`
+- `Deviations`: material departures from the original prompt, including user-authorized scope changes, or `None.`
+- `Issues / Decisions Needed`: unresolved upstream decisions, or `None.`
 
-Report conclusions, observations, and evidence.
-
-### User Decisions / Instructions
-
-Report durable user decisions that affect upstream reasoning or future work.
-
-Examples:
-
-- user chose strategy B;
-- user declared a source authoritative;
-- user rejected an assumption;
-- user explicitly asked for a decision to be carried upstream.
-
-Do not copy ordinary conversational chatter. Capture durable decisions, not conversation history.
-
-### Actions Performed
-
-Report what actually happened, including side effects.
-
-Bad:
+For project changes, prefer references such as:
 
 ```text
-NAS share prepared successfully.
-```
-
-Better:
-
-```text
-- Backed up `/etc/samba/smb.conf`.
-- Modified `/etc/samba/smb.conf`.
-- Ran `testparm`.
-- Reloaded `smb.service`.
-```
-
-### Changes
-
-For repository modifications, report refs instead of copying large diffs:
-
-```text
+Work repo: owner/project
 Work branch: codex/cache-sync
 Base commit: abc123...
 Result commit: def456...
 ```
 
-If none:
+If there were no project worktree changes, say so explicitly.
 
-```text
-No worktree changes.
-```
-
-### Validation
-
-Report relevant tests/checks and outcomes.
-
-### Artifacts
-
-Report committed artifacts and any manual return package.
-
-### Nested Relays
-
-Report every nested relay created during the round.
-
-### Deviations
-
-Report material departures from the original prompt, including changes explicitly authorized by the user during execution.
-
-Example:
-
-```text
-- The original round was read-only.
-- During execution, the user explicitly authorized editing `config.toml`.
-- The file was modified under that authorization.
-```
-
-### Issues / Decisions Needed
-
-Report unresolved upstream decisions. Use `None.` when there are none.
+The Main Agent SHOULD inspect `User Decisions / Instructions`, `Deviations`, `Nested Relays`, relevant work commits/diffs, validation, and artifacts before deciding whether another round is needed.
 
 ---
 
-## 10. User Intervention and Control Words
+## 7. User Intervention and Control Commands
 
-The user is an authorized in-band participant in a Subagent session.
+The user is an authorized in-band participant in a Subagent session. The user MAY clarify, steer execution, change scope, authorize a specific operation, reject an approach, choose between options, request related checks, or ask that a durable decision be carried upstream.
 
-The user MAY:
+- Ordinary clarification need not be reported unless it changes the outcome.
+- Operational intervention belongs in `Actions Performed`.
+- Scope-changing intervention also belongs in `Deviations`.
+- Durable choices/messages for the Main Agent belong in `User Decisions / Instructions`.
 
-- ask for explanations;
-- steer execution;
-- expand or narrow scope;
-- authorize a specific operation;
-- request an additional related check;
-- reject an approach;
-- choose between options;
-- ask that a decision be relayed upward;
-- pause or resume work.
-
-Ordinary clarification need not enter the response unless it changes a durable conclusion.
-
-Operational intervention MUST be reflected in `Actions Performed`; scope-changing intervention MUST also appear in `Deviations`.
-
-Durable decisions MUST appear in `User Decisions / Instructions`.
-
-User interaction during an open round does not create a new round. Do not invent `R0004a`, `R0004b`, or `R0005`.
+Related user additions during execution stay in the current round. The Subagent MUST NOT invent `R0004a`, `R0004b`, or `R0005`. If the user directly requests an independent extra task and it is permitted, the Subagent MAY perform it as an in-session extension and report it, but it still does not create a formal new round.
 
 ### `next round`
 
-This is the unambiguous relay command.
-
-In Subagent context:
-
-1. inspect the current relay channel;
-2. find the next pending Main-issued round;
-3. execute it.
-
-If none exists, report that briefly. Do not create one.
+Unambiguous protocol command: select and execute the lowest-numbered pending Main-issued round.
 
 ### `next`
 
-Interpret contextually.
-
-- In a quiet relay-oriented session, `next` SHOULD mean `next round`.
-- In active interactive conversation, `sure, next` or an opinion followed by `, next` may naturally mean continue the present conversation/workflow.
+Interpret contextually. In a quiet relay-oriented session it SHOULD mean `next round`. In active conversation, phrases such as `sure, next` may simply mean continue the current discussion/workflow.
 
 ### `pause`
 
-Stop further execution and preserve the current open round. Do not publish a terminal response unless the user explicitly requests a partial report.
+Stop further execution and leave the round open. Do not publish a terminal response unless the user explicitly requests a partial report.
 
 ### `resume`
 
-Continue the paused/interrupted open round. If context was lost, reconstruct from the prompt, Git state, work commits, artifacts, and verifiable machine state.
+Continue the paused/interrupted open round. Reconstruct from `prompt.md`, Git/work state, artifacts, and verifiable machine state. Never blindly repeat non-idempotent side effects.
 
 ### `continue`
 
-Normally continue the current interactive/execution context. It is weaker and more conversational than `next round`.
+Normally continue the current reasoning or execution context; it is weaker and more conversational than `next round`.
 
 ---
 
-## 11. Git Discipline and Work Branches
+## 8. Git, Work Branches, and Recovery
 
-Relay history SHOULD be append-forward.
+Published relay history SHOULD move append-forward.
 
-### Do not by default
+By default, do not:
 
 ```text
 git push --force
 git push --force-with-lease
-git rebase <published-relay-history>
-git commit --amend <published-relay-commit>
+rebase already-published relay history
+amend already-published relay commits
 ```
 
-Do not silently rewrite a published `prompt.md` or `response.md`.
-
-### Corrections
-
-Publish a corrective commit or let the Main Agent issue a new round.
-
-Example:
+Published prompts are immutable. Do not silently rewrite a published response. Correct it with a forward commit, for example:
 
 ```text
 [relay][R0004][response-fix] Correct artifact SHA
 ```
 
-### Non-fast-forward rejection
-
-If the other endpoint pushed first:
-
-1. fetch latest relay head;
-2. preserve both sides' published history;
-3. safely integrate unpublished local work;
-4. push a forward-moving result.
-
-Unpublished local commits MAY be rebased before publication.
-
-Do not solve conflicts by overwriting the other endpoint.
-
-### Recommended commit messages
+Recommended relay commits:
 
 ```text
-[relay][R0004][prompt] Audit shared cache behavior
-[relay][R0004][response] Audit shared cache behavior
-[relay][R0004][response-fix] Correct artifact SHA
-[work][R0004] Add cache synchronization script
+[relay][R0004][prompt] <title>
+[relay][R0004][response] <title>
+[relay][R0004][response-fix] <description>
 ```
 
-### Actual code changes
+If publication is rejected because the remote moved, fetch first, preserve published remote history, safely integrate unpublished local work, and push a forward-moving result. Unpublished local commits MAY be rebased before publication. Never resolve a relay conflict by overwriting the other endpoint.
 
-Put real project/code modifications on the work branch, not duplicated into the relay branch.
+For interrupted execution, leave the round open and use `resume`. Reconstruct from real Git state, project state, artifacts, and machine state rather than inventing persistent recovery metadata.
 
-The Main Agent SHOULD inspect Git comparisons directly when needed.
+Cleanup is explicit, not automatic. Do not create a final-summary file by default. Relay-branch deletion requires explicit cleanup intent. Project work-branch merge/deletion follows normal development workflow.
 
 ---
 
-## 12. Artifact Transport
+## 9. Artifact Transport
 
-Classify return artifacts pragmatically.
+Use Git for GitHub-safe relay materials such as text, compact structured data, scripts, source code, and small reports.
 
-### GitHub-safe
+Use manual transfer for required artifacts that are sensitive, private, large, binary, or otherwise unsuitable for durable Git history. Never commit passwords, private keys, access tokens, credentials, or similar secrets. A private repository is not a secret vault.
 
-Good relay candidates:
+If any manual return is required:
 
-- Markdown/text;
-- compact JSON/YAML/TOML;
-- scripts;
-- source code;
-- small reports;
-- small machine-readable metadata.
+- return at most one ZIP for the round;
+- make the ZIP self-contained and include the round response;
+- prepare the ZIP before publishing the terminal `response.md`;
+- read [`references/manual-transfer.md`](references/manual-transfer.md) before packaging or documenting the transfer.
 
-### Manual-sensitive
-
-Necessary data that should not live durably in Git history because it is personal, confidential, sensitive, or otherwise undesirable to retain there.
-
-Do not omit necessary information merely because GitHub is inappropriate. Use browser transfer.
-
-### Manual-large
-
-Necessary data unsuitable for relay Git due to size, binary form, or ergonomics:
-
-- large logs;
-- image collections;
-- databases;
-- archives;
-- generated datasets;
-- large binaries/build outputs.
-
-GitHub is a control plane, not a universal bulk-artifact transport.
-
-### Secrets
-
-Do not commit passwords, private keys, access tokens, credentials, or similar secrets to relay history.
-
-A private repository is not a secret vault.
-
-If sensitive but legitimate task data must be exchanged, use the manual path.
+`artifacts/` and `artifacts.json` are optional. Do not create them when there is nothing useful to store or describe.
 
 ---
 
-## 13. Manual Browser Fallback and Single-Upload Return
+## 10. Nested Advisory Relays
 
-Manual transfer is a first-class transport option, not a protocol failure.
+Nested orchestration is allowed. A Subagent may act as Main relative to a child agent, but every child channel still follows the one-to-one writer rule.
 
-Use it when GitHub is unavailable or an artifact is sensitive, large, binary, or manually preferred.
+A high-capability child session created for explanation, teaching, unfamiliar-domain reasoning, decision support, user steering, or independent high-quality analysis is an **ephemeral advisory leaf**.
 
-### Filename convention
+If one is created or handled:
 
-```text
-round-<NNNN>-<type>-<slug>.<ext>
-```
-
-Examples:
-
-```text
-round-0004-prompt-audit-czkawka-cache.md
-round-0004-response-audit-czkawka-cache.md
-round-0004-return-audit-czkawka-cache.zip
-```
-
-Ordering is intentional:
-
-```text
-round → number → type → semantic slug
-```
-
-### Single-upload rule
-
-If any manual return is required, the Subagent MUST prepare exactly one return ZIP for that round.
-
-Goal:
-
-> one completed round → at most one manual upload action by the user.
-
-The ZIP MUST contain:
-
-- the response Markdown;
-- every artifact that requires manual transfer;
-- a tiny manifest only if useful.
-
-Even if the response was committed to GitHub, include it in the ZIP so the package is self-contained.
-
-Example:
-
-```text
-round-0004-return-audit-czkawka-cache.zip
-```
-
-The GitHub relay MAY contain only a non-sensitive reference such as filename, purpose, and SHA-256.
-
----
-
-## 14. Nested Orchestration and Ephemeral Advisory Leaves
-
-Nested orchestration is allowed.
-
-An agent MAY be Subagent upstream and Main downstream.
-
-Each nested relationship still gets its own one-to-one relay branch.
-
-### Ephemeral advisory leaf
-
-A high-capability child session created for any of the following SHOULD normally be treated as an **ephemeral advisory leaf**:
-
-- explanation or teaching;
-- unfamiliar-domain reasoning;
-- decision support;
-- user steering;
-- independent high-quality analysis.
-
-It is not a long-lived worker.
-
-Typical flow:
-
-```text
-Top-level Main
-      ↓
-normal Subagent
-      ↓
-ephemeral advisory leaf
-      ↕
-     User
-      ↓
-final child response
-      ↓
-nested relay location propagates upward
-      ↓
-Top-level Main reads original child response
-      ↓
-child lifecycle ends
-```
-
-### Child relay ownership
-
-The direct parent and the advisory leaf are the writers to that child relay.
-
-Ancestor agents MAY read it after notification, but SHOULD NOT write to it.
-
-### Upward discovery is mandatory
-
-If a Subagent creates a nested relay, it MUST report that fact upward under `## Nested Relays`.
-
-Recommended entry:
-
-```text
-- Relay branch: `relay/web-teaching/explain-rust-lifetimes`
-- Purpose: Explain lifetime constraints relevant to the current design decision.
-- Child role: Ephemeral advisory leaf.
-- Relevant completed round: `0001-explain-borrowing-model`
-- Result commit: `abc123...`
-```
-
-The occurrence of the nested advisory task itself is important information and MUST be propagated upward.
-
-### Do not rewrite or summarize away the child
-
-The direct parent MUST NOT substitute its own summary for the advisory leaf's formal `response.md`.
-
-The original child response remains the authoritative artifact for ancestor review.
-
-This is especially important when the child conversation reveals:
-
-- limits in the user's prior knowledge;
-- new user understanding;
-- important user decisions;
-- nuanced teaching;
-- high-value reasoning from a stronger model.
-
-The parent reports the child relay's existence and location. The ancestor Main reads the child output directly.
-
-### Terminal one-way closure
-
-An ephemeral advisory leaf is terminal after:
-
-1. it publishes its final response;
-2. its relay location is propagated upward;
-3. the relevant Main Agent absorbs the result.
-
-After that:
-
-- do not send follow-up rounds to that child;
-- do not treat its relay as a persistent worker channel;
-- continue normal work through the existing Main↔Subagent relation.
-
-If a later independent high-level advisory task is needed, create a new child session and new relay branch. Do not revive the completed leaf.
-
----
-
-## 15. Failure, Recovery, and Cleanup
-
-### Interrupted execution
-
-Do not create protocol-wide heartbeats or checkpoint logs.
-
-Leave the round open and use `resume`.
-
-Task-specific checkpoints MAY exist when the task itself requires them; they are not default relay metadata.
-
-### Artifacts must exist before terminal response
-
-Correct order:
-
-```text
-finish work
-→ prepare GitHub-safe artifacts
-→ prepare manual ZIP if needed
-→ compute hashes/references
-→ write/publish response
-→ mark round completed
-```
-
-If a required package cannot be prepared, use `Partial` or `Blocked`.
-
-Do not declare completion while promising a future artifact.
-
-### Relay conflicts
-
-Preserve published history. Do not force-push over the other endpoint. If safe resolution is unclear, stop and report the conflict.
-
-### Cleanup
-
-Cleanup is explicit, never automatic.
-
-When a task ends:
-
-- do not create a cumulative final summary file unless explicitly requested;
-- the Main Agent MAY tell the user the relay branch is no longer needed;
-- branch deletion requires explicit cleanup intent;
-- work-branch merge/deletion follows normal development workflow.
-
-Deleting a branch is housekeeping, not guaranteed secure erasure of previously pushed history.
-
----
-
-## 16. Main-Agent Review Checklist
-
-When a response arrives, the Main Agent SHOULD:
-
-1. read `response.md`;
-2. inspect `User Decisions / Instructions`;
-3. inspect `Deviations`;
-4. inspect `Nested Relays`;
-5. inspect relevant work-branch commits/diffs;
-6. inspect GitHub-safe artifacts;
-7. process the single manual ZIP if declared;
-8. decide whether another round is needed.
-
-Do not accept a generic “done” as sufficient evidence when the task requires validation.
-
----
-
-## 17. Bootstrap Patterns
-
-### First Subagent session
-
-The Main Agent SHOULD generate something like:
-
-```text
-Read and follow the installed Agent Relay SKILL.
-
-Relay branch: relay/laptop/photo-import-cleanup
-
-Execute the pending round.
-```
-
-### Later rounds
-
-```text
-next round
-```
-
-When context makes it natural:
-
-```text
-next
-```
-
-### Manual prompt-file bootstrap
-
-```text
-Read and follow the installed Agent Relay SKILL.
-
-Execute:
-C:\Users\jay\Downloads\round-0003-prompt-audit-cache.md
-```
-
-A concrete prompt-file path is strong Subagent-role evidence.
-
----
-
-## 18. Compact Examples
-
-### Example Main prompt
-
-```markdown
-# Round 0004 — Audit Shared Cache Reuse
-
-## Objective
-Determine whether an existing desktop-generated cache can be reused safely on another machine for the same NAS library.
-
-## Context
-- NAS access uses a stable UNC path.
-- Desktop cache already exists.
-- Do not assume portability without verification.
-
-## Scope
-### Allowed
-- Read local files/configuration.
-- Run diagnostics.
-- Inspect cache metadata.
-### Not Allowed
-- Delete user data.
-- Modify NAS configuration.
-
-## Tasks
-1. Locate the cache.
-2. Identify relevant cache keys.
-3. Verify portability.
-4. Recommend a reuse procedure.
-
-## Deliverables
-- `response.md`
-- Compact supporting artifacts when useful.
-
-## Return Policy
-- Commit GitHub-safe artifacts.
-- Put sensitive/large required artifacts in one return ZIP.
-```
-
-### Example Subagent response
-
-```markdown
-# Round 0004 — Response
-
-## Outcome
-Completed
-
-## Findings
-- Cache entries use stable UNC paths.
-- The tested cache key is portable across the two machines.
-
-## User Decisions / Instructions
-- The user wants the NAS copy treated as authoritative.
-
-## Actions Performed
-- Located the active cache directory.
-- Inspected cache metadata.
-- Ran portability checks.
-
-## Changes
-No worktree changes.
-
-## Validation
-- Reused the cache successfully against the same UNC path.
-
-## Artifacts
-- `reports/cache-analysis.json` — committed.
-
-## Nested Relays
-None.
-
-## Deviations
-None.
-
-## Issues / Decisions Needed
-None.
-```
-
----
-
-## 19. Normative Summary
-
-- **MUST** infer role from environment and context, not model identity alone.
-- **MUST** keep one relay branch to one Main↔Subagent writer pair.
-- **MUST** use the dedicated private relay repository `<GitHub-login>/agent-relay`.
-- **MUST** keep local relay Git state under `~/workspaces/agent-relay`.
-- **MUST NOT** place relay protocol state inside an unrelated project repository merely for convenience.
-- **MUST** let only the Main Agent create formal new rounds.
-- **MUST** keep formal relay materials in English.
-- **MUST** keep global housekeeping minimal and fixed-purpose.
-- **MUST NOT** invent persistent logs, summaries, registries, or metadata structures.
-- **MUST** report durable user decisions.
-- **MUST** report actions and side effects explicitly.
-- **MUST** report deviations from upstream scope.
-- **MUST** report nested relay creation upward.
-- **MUST NOT** replace an ephemeral advisory leaf's original response with a parent-agent rewrite.
-- **MUST** treat an ephemeral advisory leaf as terminal after its result is propagated and absorbed.
-- **MUST** prepare one self-contained ZIP when any manual return is required.
-- **MUST NOT** omit necessary sensitive information merely because GitHub is unsuitable; use manual transfer.
-- **MUST NOT** force-push or rewrite published relay history by default.
-- **SHOULD** use GitHub as the control plane for prompts, responses, small artifacts, and commit inspection.
-- **SHOULD** use normal work branches for actual code/project changes.
-- **SHOULD** use `next round` as the unambiguous relay execution command.
-- **SHOULD** make first-session bootstrap prompts short and directly copyable.
-- **MAY** adapt prompt/response formatting when task semantics justify it, while preserving the required distinctions.
+- it MUST use its own relay branch;
+- its existence and exact discoverability information MUST be propagated upward through every ancestor;
+- the parent MUST NOT replace the child's formal `response.md` with its own rewrite or summary;
+- ancestors SHOULD read the original child response directly;
+- after the final child response is propagated upward and absorbed, that leaf is terminal and MUST NOT receive follow-up rounds;
+- a later independent advisory need requires a new child session and a new relay branch;
+- read [`references/nested-advisory.md`](references/nested-advisory.md) when creating, reporting, or consuming such a relay.
